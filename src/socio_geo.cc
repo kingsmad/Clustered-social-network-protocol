@@ -8,7 +8,7 @@ Node::Node(int ssid) : sid_(ssid) { Init(); }
 
 void Node::Init() {
   int places_cnt;
-  scanf("%d", &places_cnt);
+  scanf("%d%d", &places_cnt, &speed_);
   for (size_t i = 0; i < places_cnt; ++i) {
     int x, y;
     scanf("%d%d", &x, &y);
@@ -118,6 +118,9 @@ void Graph::Run(int cnt) {
         }
     }
   }
+
+  for (Node* o : nodes_) { printf("%d ", o->Stat()); }
+  printf("\n");
 }
 
 inline int64_t Graph::TwoDim2One(const std::pair<int, int>& pair) {
@@ -164,8 +167,8 @@ void Graph::Init() {
           static_cast<double>(cnt) / nodes_.at(j)->Places().size() * i_sz;
     }
   }
-  for (size_t i = 0; i < MAXNODE; ++i) {
-    for (size_t j = 0; j < MAXNODE; ++j) { nodes_[i]->EnCount(j) = 0; }
+  for (size_t i = 0; i < nodes_.size(); ++i) {
+    for (size_t j = 0; j < nodes_.size(); ++j) { nodes_[i]->EnCount(j) = 0; }
   }
 }
 
