@@ -4,11 +4,14 @@
 
 namespace socio {
 
-Node::Node(int ssid) : sid_(ssid) { Init(); }
+Node::Node(int ssid, int tot_node_num, int places_cnt)
+    : sid_(ssid), generator_(rd_()), uni_(0, places_cnt - 1) {
+  Init(tot_node_num, places_cnt);
+}
 
-void Node::Init() {
-  int places_cnt;
-  scanf("%d%d", &places_cnt, &speed_);
+void Node::Init(int tot_node_num, int places_cnt) {
+  enc_pr_.resize(tot_node_num);
+  enc_count_.resize(tot_node_num);
   for (size_t i = 0; i < places_cnt; ++i) {
     int x, y;
     scanf("%d%d", &x, &y);
@@ -19,93 +22,89 @@ void Node::Init() {
   current_dst_idx_ = 1;
 }
 
-void Node::AddNewMsg(int seq, int src, int dst, int num) {
-  Message* msg = new Message(seq, src, dst, num);
-  seq2msg_.emplace(seq, msg);
+void Node::AddMsg(int seq, int num, int src, int dst) {
+  printf("Msg is added! : (%d, %d, %d, %d)\n", seq, src, dst, num);
+  if (dst == Sid()) {
+    Stat() += num;
+    return;
+  }
+  auto it = seq2msg_.find(seq);
+  if (it != seq2msg_.end()) {
+    it->second->cnt += num;
+  } else {
+    Message* msg = new Message(seq, src, dst, num);
+    seq2msg_.emplace(seq, msg);
+  }
   BufferSize() += num;
 }
 
-void Node::DelMsg(int seq) {
-  if (seq2msg_.count(seq) == 0) { return; }
-  Message* msg = seq2msg_.at(seq);
-  BufferSize() += msg->copy_cnt;
-  delete (msg);
-}
-
-void Node::DelMsg(Message* msg) {
-  BufferSize() += msg->copy_cnt;
-  delete (msg);
-}
-
-void Node::Forward(Message* msg, Node* dst) {
-  if (msg->dst == dst->Sid()) {
-    dst->Stat() += msg->copy_cnt;
-    DelMsg(msg);
-    return;
+void Node::RemoveMsg(int seq, int num) {
+  auto it = seq2msg_.find(seq);
+  if (it == seq2msg_.end()) { return; }
+  Message* msg = it->second;
+  msg->cnt -= num;
+  BufferSize() += num;
+  if (msg->cnt == 0) {
+    delete msg;
+    seq2msg_.erase(it);
   }
-
-  int copy_cnt = msg->copy_cnt;
-  msg->copy_cnt = copy_cnt / 2;
-
-  Message* new_msg =
-      new Message(msg->seq, msg->src, msg->dst, copy_cnt - msg->copy_cnt);
-  dst->seq2msg_.emplace(new_msg->seq, new_msg);
-  this->BufferSize() -= new_msg->copy_cnt;
-  dst->BufferSize() += new_msg->copy_cnt;
 }
 
 // position will change
 std::pair<int, int> Node::NextPosition() {
   if (Places().size() == 1) { return Places().front(); }
-  int dx = 0, dy = 0;
   std::pair<int, int>& cp = Places().at(current_dst_idx_);
-  if (cp.first != xp()) {
-    dx = (cp.first > xp()) ? 1 : -1;
-  } else if (cp.second != yp()) {
-    dy = (cp.first > yp()) ? 1 : -1;
+  if (cp.first > xp()) {
+    ++xp();
+  } else if (cp.first < xp()) {
+    --xp();
+  } else if (cp.second > yp()) {
+    ++yp();
+  } else if (cp.second < yp()) {
+    --yp();
   }
-  xp() = xp() + dx * speed_;
-  yp() = yp() + dy * speed_;
 
   if (xp() == cp.first && yp() == cp.second) {
-    current_dst_idx_ = (current_dst_idx_ + 1) % Places().size();
+    current_dst_idx_ = uni_(generator_);
+    printf("Current idx of node %d is : %d\n", Sid(), current_dst_idx_);
   }
-
+  printf("The next position of node %d is: %d %d\n", Sid(), xp(), yp());
   return std::make_pair(xp(), yp());
 }
 
 bool Node::HasMsg(int seq) { return seq2msg_.count(seq) > 0; }
 
 void Node::Encounter(Node* enc_node) {
-  std::vector<int> erase_seq_buffer;
-  for (auto pair : seq2msg_) {
-    int seq = pair.first;
+  printf("Node %d encounters node %d\n", Sid(), enc_node->Sid());
+  std::vector<std::pair<int, Message*>> pairs;
+  for (auto pair : seq2msg_) { pairs.emplace_back(pair.first, pair.second); }
+
+  for (auto pair : pairs) {
     Message* msg = pair.second;
+    int seq = pair.first;
     if (msg->dst == enc_node->Sid()) {
-      Forward(msg, enc_node);
+      enc_node->AddMsg(seq, msg->cnt, msg->src, msg->dst);
+      RemoveMsg(seq, msg->cnt);
     } else if (enc_node->HasMsg(seq)) {
       continue;
     } else {
-      if (msg->copy_cnt > 1) {
-        Forward(msg, enc_node);
-      } else if (msg->copy_cnt == 1) {
+      if (msg->cnt > 1) {
+        int forward_cnt = msg->cnt - msg->cnt / 2;
+        enc_node->AddMsg(seq, forward_cnt, msg->src, msg->dst);
+        RemoveMsg(seq, forward_cnt);
+      } else if (msg->cnt == 1) {
         if (enc_node->EnPr(msg->dst) > this->EnPr(msg->dst)
             || enc_node->EnCount(msg->dst) > alpha) {
-          Forward(msg, enc_node);
-          erase_seq_buffer.push_back(msg->seq);
+          enc_node->AddMsg(seq, 1, msg->src, msg->dst);
+          RemoveMsg(seq, 1);
         }
       }
     }
   }
-  for (int seq : erase_seq_buffer) {
-    auto it = seq2msg_.find(seq);
-    delete it->second;
-    seq2msg_.erase(it);
-  }
 }
 
 Message::Message(int sseq, int ssrc, int ddst, int ccnt)
-    : seq(sseq), src(ssrc), dst(ddst), copy_cnt(ccnt) {}
+    : seq(sseq), src(ssrc), dst(ddst), cnt(ccnt) {}
 
 void Graph::Run(int cnt) {
   while (cnt--) {
@@ -136,10 +135,12 @@ void Graph::move(Node* o) {
 
 void Graph::Init() {
   // init nodes
-  int nodes_cnt = 0;
+  int nodes_cnt;
   scanf("%d", &nodes_cnt);
   for (size_t i = 0; i < nodes_cnt; ++i) {
-    Node* p = new Node(i);
+    int places_cnt;
+    scanf("%d", &places_cnt);
+    Node* p = new Node(i, nodes_cnt, places_cnt);
     nodes_.emplace_back(p);
   }
 
@@ -149,7 +150,7 @@ void Graph::Init() {
   for (int i = 0; i < msg_cnt; ++i) {
     int src, dst, num;
     scanf("%d%d%d", &src, &dst, &num);
-    nodes_[src]->AddNewMsg(i, src, dst, num);
+    nodes_[src]->AddMsg(i, num, src, dst);
   }
 
   // caculate pr
