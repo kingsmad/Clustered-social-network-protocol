@@ -10,8 +10,8 @@
 
 namespace socio {
 
-const int BOARD_SZ = 5e3 + 10;
-const int ROW_SZ = 5e3 + 10;
+const int ROW_SZ = 500;
+const int COL_SZ = 500;
 const int MAXNODE = 1e3 + 10;
 const int BUFFER_SZ = 20;
 const int alpha = 3;
@@ -28,6 +28,7 @@ class Message {
 class Node {
  public:
   Node() = default;
+  ~Node();
   Node(int sid, int tot_node_num, int places_cnt);
   void Init(int tot_node_num, int places_cnt);
   void AddMsg(int seq, int num, int src=-1, int dst=-1);
@@ -70,6 +71,7 @@ class Graph {
   void move(Node* o);
   std::vector<Node*> nodes_;
   std::unordered_map<int64_t, std::unordered_set<Node*>> pos2nodes_;
+  std::unordered_map<int, int> nodes_exp_msg_cnt;
 };
 
 }

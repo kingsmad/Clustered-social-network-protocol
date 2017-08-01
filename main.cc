@@ -8,5 +8,5 @@ int main() {
   freopen("../input.txt", "r", stdin);
   socio::Graph graph;
   graph.Init();
-  graph.Run(1000);
+  graph.Run(100000);
 }

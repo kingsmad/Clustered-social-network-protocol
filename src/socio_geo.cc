@@ -5,8 +5,14 @@
 namespace socio {
 
 Node::Node(int ssid, int tot_node_num, int places_cnt)
-    : sid_(ssid), generator_(rd_()), uni_(0, places_cnt - 1) {
+    : sid_(ssid), stat_(0), generator_(rd_()), uni_(0, places_cnt - 1) {
   Init(tot_node_num, places_cnt);
+}
+
+Node::~Node() {
+  for (auto it = seq2msg_.begin(); it != seq2msg_.end(); ++it) {
+    delete it->second;
+  }
 }
 
 void Node::Init(int tot_node_num, int places_cnt) {
@@ -66,9 +72,9 @@ std::pair<int, int> Node::NextPosition() {
 
   if (xp() == cp.first && yp() == cp.second) {
     current_dst_idx_ = uni_(generator_);
-    printf("Current idx of node %d is : %d\n", sid(), current_dst_idx_);
+    // printf("Current idx of node %d is : %d\n", sid(), current_dst_idx_);
   }
-  printf("The next position of node %d is: %d %d\n", sid(), xp(), yp());
+  // printf("The next position of node %d is: %d %d\n", sid(), xp(), yp());
   return std::make_pair(xp(), yp());
 }
 
@@ -84,18 +90,23 @@ void Node::Encounter(Node* enc_node) {
     int seq = pair.first;
     if (msg->dst == enc_node->sid()) {
       enc_node->AddMsg(seq, msg->cnt, msg->src, msg->dst);
+      printf("Meet destination! Transfer %d msgs from %d to %d\n", msg->cnt,
+             msg->src, msg->dst);
       RemoveMsg(seq, msg->cnt);
     } else if (enc_node->HasMsg(seq)) {
       continue;
     } else {
       if (msg->cnt > 1) {
         int forward_cnt = msg->cnt - msg->cnt / 2;
+        printf("Forwarding %d msgs from %d to %d\n", forward_cnt, msg->src,
+               msg->dst);
         enc_node->AddMsg(seq, forward_cnt, msg->src, msg->dst);
         RemoveMsg(seq, forward_cnt);
       } else if (msg->cnt == 1) {
         if (enc_node->EnPr(msg->dst) > this->EnPr(msg->dst)
             || enc_node->EnCount(msg->dst) > alpha) {
           enc_node->AddMsg(seq, 1, msg->src, msg->dst);
+          printf("Forwarding 1 msgs from %d to %d\n", msg->src, msg->dst);
           RemoveMsg(seq, 1);
         }
       }
@@ -113,12 +124,27 @@ void Graph::Run(int cnt) {
       std::unordered_set<Node*>& nset = it.second;
       for (Node* p : nset)
         for (Node* q : nset) {
-          if (p != q) { p->Encounter(q); }
+          if (p != q) {
+            p->Encounter(q);
+            ++nodes_[q->sid()]->EnCount(p->sid());
+            ++nodes_[p->sid()]->EnCount(q->sid());
+          }
         }
     }
   }
 
+  // calc statistics
   for (Node* o : nodes_) { printf("%d ", o->stat()); }
+  for (auto pair : nodes_exp_msg_cnt) {
+    int sid = pair.first;
+    int exp_cnt = pair.second;
+    printf(
+        "Node %d expected %d messages, received %d msgs, success rate is %f\n ",
+        sid, exp_cnt, nodes_[sid]->stat(),
+        static_cast<double>(nodes_[sid]->stat()) / exp_cnt);
+  }
+
+  for (Node* o : nodes_) { delete o; }
   printf("\n");
 }
 
@@ -151,6 +177,7 @@ void Graph::Init() {
     int src, dst, num;
     scanf("%d%d%d", &src, &dst, &num);
     nodes_[src]->AddMsg(i, num, src, dst);
+    nodes_exp_msg_cnt[dst] += num;
   }
 
   // caculate pr
@@ -166,6 +193,7 @@ void Graph::Init() {
       }
       nodes_[i]->EnPr(j) =
           static_cast<double>(cnt) / nodes_.at(j)->places().size() * i_sz;
+      nodes_[j]->EnPr(j) = nodes_[i]->EnPr(j);
     }
   }
   for (size_t i = 0; i < nodes_.size(); ++i) {
