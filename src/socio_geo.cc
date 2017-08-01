@@ -24,8 +24,8 @@ void Node::Init(int tot_node_num, int places_cnt) {
 
 void Node::AddMsg(int seq, int num, int src, int dst) {
   printf("Msg is added! : (%d, %d, %d, %d)\n", seq, src, dst, num);
-  if (dst == Sid()) {
-    Stat() += num;
+  if (dst == sid()) {
+    stat() += num;
     return;
   }
   auto it = seq2msg_.find(seq);
@@ -35,7 +35,7 @@ void Node::AddMsg(int seq, int num, int src, int dst) {
     Message* msg = new Message(seq, src, dst, num);
     seq2msg_.emplace(seq, msg);
   }
-  BufferSize() += num;
+  buf_sz() += num;
 }
 
 void Node::RemoveMsg(int seq, int num) {
@@ -43,7 +43,7 @@ void Node::RemoveMsg(int seq, int num) {
   if (it == seq2msg_.end()) { return; }
   Message* msg = it->second;
   msg->cnt -= num;
-  BufferSize() += num;
+  buf_sz() += num;
   if (msg->cnt == 0) {
     delete msg;
     seq2msg_.erase(it);
@@ -52,8 +52,8 @@ void Node::RemoveMsg(int seq, int num) {
 
 // position will change
 std::pair<int, int> Node::NextPosition() {
-  if (Places().size() == 1) { return Places().front(); }
-  std::pair<int, int>& cp = Places().at(current_dst_idx_);
+  if (places().size() == 1) { return places().front(); }
+  std::pair<int, int>& cp = places().at(current_dst_idx_);
   if (cp.first > xp()) {
     ++xp();
   } else if (cp.first < xp()) {
@@ -66,23 +66,23 @@ std::pair<int, int> Node::NextPosition() {
 
   if (xp() == cp.first && yp() == cp.second) {
     current_dst_idx_ = uni_(generator_);
-    printf("Current idx of node %d is : %d\n", Sid(), current_dst_idx_);
+    printf("Current idx of node %d is : %d\n", sid(), current_dst_idx_);
   }
-  printf("The next position of node %d is: %d %d\n", Sid(), xp(), yp());
+  printf("The next position of node %d is: %d %d\n", sid(), xp(), yp());
   return std::make_pair(xp(), yp());
 }
 
 bool Node::HasMsg(int seq) { return seq2msg_.count(seq) > 0; }
 
 void Node::Encounter(Node* enc_node) {
-  printf("Node %d encounters node %d\n", Sid(), enc_node->Sid());
+  printf("Node %d encounters node %d\n", sid(), enc_node->sid());
   std::vector<std::pair<int, Message*>> pairs;
   for (auto pair : seq2msg_) { pairs.emplace_back(pair.first, pair.second); }
 
   for (auto pair : pairs) {
     Message* msg = pair.second;
     int seq = pair.first;
-    if (msg->dst == enc_node->Sid()) {
+    if (msg->dst == enc_node->sid()) {
       enc_node->AddMsg(seq, msg->cnt, msg->src, msg->dst);
       RemoveMsg(seq, msg->cnt);
     } else if (enc_node->HasMsg(seq)) {
@@ -118,7 +118,7 @@ void Graph::Run(int cnt) {
     }
   }
 
-  for (Node* o : nodes_) { printf("%d ", o->Stat()); }
+  for (Node* o : nodes_) { printf("%d ", o->stat()); }
   printf("\n");
 }
 
@@ -157,15 +157,15 @@ void Graph::Init() {
   std::set<std::pair<int, int>> pset;
   for (size_t i = 0; i < nodes_cnt; ++i) {
     pset.clear();
-    for (std::pair<int, int>& p : nodes_.at(i)->Places()) { pset.emplace(p); }
-    int i_sz = nodes_.at(i)->Places().size();
+    for (std::pair<int, int>& p : nodes_.at(i)->places()) { pset.emplace(p); }
+    int i_sz = nodes_.at(i)->places().size();
     for (size_t j = i + 1; j < nodes_cnt; ++j) {
       int cnt = 0;
-      for (std::pair<int, int>& q : nodes_.at(j)->Places()) {
+      for (std::pair<int, int>& q : nodes_.at(j)->places()) {
         if (pset.count(q)) { ++cnt; }
       }
       nodes_[i]->EnPr(j) =
-          static_cast<double>(cnt) / nodes_.at(j)->Places().size() * i_sz;
+          static_cast<double>(cnt) / nodes_.at(j)->places().size() * i_sz;
     }
   }
   for (size_t i = 0; i < nodes_.size(); ++i) {

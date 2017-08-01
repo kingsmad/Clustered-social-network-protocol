@@ -38,12 +38,12 @@ class Node {
 
   inline double& EnPr(int enc_node) { return enc_pr_[enc_node];} 
   inline int& EnCount(int enc_node) { return enc_count_[enc_node];}
-  inline int& Sid() { return sid_;}
-  inline int& BufferSize() { return buf_sz_;}
+  inline int& sid() { return sid_;}
+  inline int& buf_sz() { return buf_sz_;}
   inline int& xp() { return xp_;}
   inline int& yp() { return yp_;}
-  inline int& Stat() { return stat_;}
-  inline std::vector<std::pair<int, int> >& Places() { return places_;}
+  inline int& stat() { return stat_;}
+  inline std::vector<std::pair<int, int> >& places() { return places_;}
   inline std::pair<int, int> CurPosition() { return std::make_pair(xp(), yp());}
  private:
   std::vector<std::pair<int, int> > places_; 
