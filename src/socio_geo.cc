@@ -1,5 +1,6 @@
 #include "socio_geo.h"
 #include <algorithm>
+#include <memory>
 #include <set>
 
 namespace socio {
@@ -120,22 +121,49 @@ Message::Message(int sseq, int ssrc, int ddst, int ccnt)
 void Graph::Run(int cnt) {
   while (cnt--) {
     for (Node* p : nodes_) { move(p); }
-    for (auto it : pos2nodes_) {
-      std::unordered_set<Node*>& nset = it.second;
-      for (Node* p : nset)
-        for (Node* q : nset) {
-          if (p != q) {
-            p->Encounter(q);
-            ++nodes_[q->sid()]->EnCount(p->sid());
-            ++nodes_[p->sid()]->EnCount(q->sid());
+    int64_t st = 0;
+    int64_t pos_sz = ROW_SZ * COL_SZ;
+    while (st < pos_sz) {
+      int64_t ed = std::min(st + kParalleSize, pos_sz);
+      cpu_stream_.SendWork([st, ed, this]() {
+        for (int64_t i = st; i < ed; ++i) {
+          auto it = pos2nodes_.find(i);
+          if (it == pos2nodes_.end()) continue;
+          std::unordered_set<Node*>& nset = it->second;
+          for (Node* p : nset) {
+            for (Node* q : nset) {
+              if (p != q) {
+                p->Encounter(q);
+                ++this->nodes_[q->sid()]->EnCount(p->sid());
+                ++this->nodes_[p->sid()]->EnCount(q->sid());
+              }
+            }
           }
         }
+      });
+      st = ed;
     }
+    cpu_stream_.SyncStream();
+    if (cnt % kSnapshotPerRound == 0) { Statistic(); }
   }
 
-  // calc statistics
+  for (Node* o : nodes_) { delete o; }
+  printf("\n");
+}
+
+void Graph::Statistic() {
+  printf("Msgs received by every nodes:\n");
   for (Node* o : nodes_) { printf("%d ", o->stat()); }
-  for (auto pair : nodes_exp_msg_cnt) {
+  printf("\n");
+
+  int64_t msg_cnt = 0;
+  for (Node* o : nodes_) msg_cnt += o->stat();
+  int64_t msg_tot = 0;
+  for (auto pair : nodes_exp_msg_cnt_) msg_tot += pair.second;
+  printf("total recv-percentage is : %f\n",
+         static_cast<double>(msg_cnt) / msg_tot);
+
+  for (auto pair : nodes_exp_msg_cnt_) {
     int sid = pair.first;
     int exp_cnt = pair.second;
     printf(
@@ -143,9 +171,6 @@ void Graph::Run(int cnt) {
         sid, exp_cnt, nodes_[sid]->stat(),
         static_cast<double>(nodes_[sid]->stat()) / exp_cnt);
   }
-
-  for (Node* o : nodes_) { delete o; }
-  printf("\n");
 }
 
 inline int64_t Graph::TwoDim2One(const std::pair<int, int>& pair) {
@@ -177,7 +202,7 @@ void Graph::Init() {
     int src, dst, num;
     scanf("%d%d%d", &src, &dst, &num);
     nodes_[src]->AddMsg(i, num, src, dst);
-    nodes_exp_msg_cnt[dst] += num;
+    nodes_exp_msg_cnt_[dst] += num;
   }
 
   // caculate pr

@@ -7,7 +7,7 @@ project (socio)
 
 set(CMAKE_BUILD_TYPE "Debug")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wno-sign-compare -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wno-sign-compare -std=c++11 -pthread")
 
 add_subdirectory(src)
 

@@ -32,7 +32,7 @@ def gen_random_msg(msg_tot_cnt, max_node_idx):
         dst = random.randint(0, max_node_idx-1)
         while dst == src:
             dst = random.randint(0, max_node_idx-1)
-        cnt = random.randint(0, kMaxMsgCnt-1)
+        cnt = random.randint(1, kMaxMsgCnt-1)
         print ("%d %d %d\n" %(src, dst, cnt))
         msg_tot_cnt -= 1
 

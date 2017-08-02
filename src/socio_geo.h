@@ -7,6 +7,8 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <random>
+#include <thread>
+#include "cpu_stream.h"
 
 namespace socio {
 
@@ -15,6 +17,9 @@ const int COL_SZ = 500;
 const int MAXNODE = 1e3 + 10;
 const int BUFFER_SZ = 20;
 const int alpha = 3;
+const int kSnapshotPerRound = 1000;
+const int kThreadNum = 16;
+const int kParalleSize = ROW_SZ * COL_SZ / (kThreadNum*8) + 10;
 
 class Message {
  public:
@@ -67,13 +72,15 @@ class Graph {
   void Init();
     
  private:
+  void Statistic();
   int64_t TwoDim2One(const std::pair<int, int>&);
   void move(Node* o);
   std::vector<Node*> nodes_;
   std::unordered_map<int64_t, std::unordered_set<Node*>> pos2nodes_;
-  std::unordered_map<int, int> nodes_exp_msg_cnt;
+  std::unordered_map<int, int> nodes_exp_msg_cnt_;
+  CpuStream cpu_stream_;
 };
 
-}
+} // namespace socio
 
 #endif
