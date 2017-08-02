@@ -12,15 +12,6 @@
 
 namespace socio {
 
-const int ROW_SZ = 500;
-const int COL_SZ = 500;
-const int MAXNODE = 1e3 + 10;
-const int BUFFER_SZ = 20;
-const int alpha = 3;
-const int kSnapshotPerRound = 1000;
-const int kThreadNum = 16;
-const int kParalleSize = ROW_SZ * COL_SZ / (kThreadNum*8) + 10;
-
 class Message {
  public:
   Message() = default;

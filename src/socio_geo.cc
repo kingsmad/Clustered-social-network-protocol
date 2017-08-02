@@ -1,7 +1,19 @@
 #include "socio_geo.h"
+#include <stdarg.h>
 #include <algorithm>
 #include <memory>
 #include <set>
+#include "common.h"
+
+extern bool debug;
+
+static void buginfo(const char* f, ...) {
+  if (!debug) return;
+  va_list al;
+  va_start(al, f);
+  vprintf(f, al);
+  va_end(al);
+}
 
 namespace socio {
 
@@ -30,7 +42,7 @@ void Node::Init(int tot_node_num, int places_cnt) {
 }
 
 void Node::AddMsg(int seq, int num, int src, int dst) {
-  printf("Msg is added! : (%d, %d, %d, %d)\n", seq, src, dst, num);
+  buginfo("Msg is added! : (%d, %d, %d, %d)\n", seq, src, dst, num);
   if (dst == sid()) {
     stat() += num;
     return;
@@ -73,16 +85,16 @@ std::pair<int, int> Node::NextPosition() {
 
   if (xp() == cp.first && yp() == cp.second) {
     current_dst_idx_ = uni_(generator_);
-    // printf("Current idx of node %d is : %d\n", sid(), current_dst_idx_);
+    // buginfo("Current idx of node %d is : %d\n", sid(), current_dst_idx_);
   }
-  // printf("The next position of node %d is: %d %d\n", sid(), xp(), yp());
+  // buginfo("The next position of node %d is: %d %d\n", sid(), xp(), yp());
   return std::make_pair(xp(), yp());
 }
 
 bool Node::HasMsg(int seq) { return seq2msg_.count(seq) > 0; }
 
 void Node::Encounter(Node* enc_node) {
-  printf("Node %d encounters node %d\n", sid(), enc_node->sid());
+  buginfo("Node %d encounters node %d\n", sid(), enc_node->sid());
   std::vector<std::pair<int, Message*>> pairs;
   for (auto pair : seq2msg_) { pairs.emplace_back(pair.first, pair.second); }
 
@@ -91,23 +103,23 @@ void Node::Encounter(Node* enc_node) {
     int seq = pair.first;
     if (msg->dst == enc_node->sid()) {
       enc_node->AddMsg(seq, msg->cnt, msg->src, msg->dst);
-      printf("Meet destination! Transfer %d msgs from %d to %d\n", msg->cnt,
-             msg->src, msg->dst);
+      buginfo("Meet destination! Transfer %d msgs from %d to %d\n", msg->cnt,
+              msg->src, msg->dst);
       RemoveMsg(seq, msg->cnt);
     } else if (enc_node->HasMsg(seq)) {
       continue;
     } else {
       if (msg->cnt > 1) {
         int forward_cnt = msg->cnt - msg->cnt / 2;
-        printf("Forwarding %d msgs from %d to %d\n", forward_cnt, msg->src,
-               msg->dst);
+        buginfo("Forwarding %d msgs from %d to %d\n", forward_cnt, msg->src,
+                msg->dst);
         enc_node->AddMsg(seq, forward_cnt, msg->src, msg->dst);
         RemoveMsg(seq, forward_cnt);
       } else if (msg->cnt == 1) {
         if (enc_node->EnPr(msg->dst) > this->EnPr(msg->dst)
-            || enc_node->EnCount(msg->dst) > alpha) {
+            || enc_node->EnCount(msg->dst) > kAlpha) {
           enc_node->AddMsg(seq, 1, msg->src, msg->dst);
-          printf("Forwarding 1 msgs from %d to %d\n", msg->src, msg->dst);
+          buginfo("Forwarding 1 msgs from %d to %d\n", msg->src, msg->dst);
           RemoveMsg(seq, 1);
         }
       }
@@ -122,7 +134,7 @@ void Graph::Run(int cnt) {
   while (cnt--) {
     for (Node* p : nodes_) { move(p); }
     int64_t st = 0;
-    int64_t pos_sz = ROW_SZ * COL_SZ;
+    int64_t pos_sz = kRowSize * kColSize;
     while (st < pos_sz) {
       int64_t ed = std::min(st + kParalleSize, pos_sz);
       cpu_stream_.SendWork([st, ed, this]() {
@@ -148,7 +160,6 @@ void Graph::Run(int cnt) {
   }
 
   for (Node* o : nodes_) { delete o; }
-  printf("\n");
 }
 
 void Graph::Statistic() {
@@ -171,10 +182,11 @@ void Graph::Statistic() {
         sid, exp_cnt, nodes_[sid]->stat(),
         static_cast<double>(nodes_[sid]->stat()) / exp_cnt);
   }
+  printf("\n");
 }
 
 inline int64_t Graph::TwoDim2One(const std::pair<int, int>& pair) {
-  return pair.first * ROW_SZ + pair.second;
+  return pair.first * kRowSize + pair.second;
 }
 
 void Graph::move(Node* o) {

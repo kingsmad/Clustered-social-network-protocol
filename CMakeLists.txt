@@ -15,7 +15,7 @@ add_executable(run main.cc)
 
 target_link_libraries(run graph)
 
-file(GLOB all_source_file ./src*.h ./src/*.cpp ./src/*.cc)
+file(GLOB all_source_file ./src*.h ./src/*.cpp ./src/*.cc ./main.cc)
 add_custom_target(socio_format COMMAND clang-format -style=file -i ${all_source_file})
 
 add_dependencies(run socio_format)
