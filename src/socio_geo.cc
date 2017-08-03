@@ -131,7 +131,7 @@ Message::Message(int sseq, int ssrc, int ddst, int ccnt)
     : seq(sseq), src(ssrc), dst(ddst), cnt(ccnt) {}
 
 void Graph::Run(int cnt) {
-  while (cnt--) {
+  for (int i = 0; i < cnt; ++i) {
     for (Node* p : nodes_) { move(p); }
     int64_t st = 0;
     int64_t pos_sz = kRowSize * kColSize;
@@ -156,7 +156,10 @@ void Graph::Run(int cnt) {
       st = ed;
     }
     cpu_stream_.SyncStream();
-    if (cnt % kSnapshotPerRound == 0) { Statistic(); }
+    if (i % kSnapshotPerRound == 0) {
+      printf("Snapshot in round: %d\n", i / 1800);
+      Statistic();
+    }
   }
 
   for (Node* o : nodes_) { delete o; }
